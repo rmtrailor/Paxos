@@ -28,9 +28,20 @@ public class PaxosLayer {
         // Setup the Paxos nodes
         this.numNodes = numNodes;
         this.nodes = new PaxosNode[this.numNodes];
+        Membership tempMembership = new Membership(); // Temp membership to give all the new Paxos nodes
+
         for (int i = 0; i < this.numNodes; i++) {
             nodes[i] = new PaxosNode(i);
+            tempMembership.createNode(i, 8000 + i, "UP");
         }
+
+        // Now that we've created all the Paxos nodes, we can give each node the finalized
+        // membership.
+        tempMembership.setInitialized(); // seal the membership
+        for (int i = 0; i < this.numNodes; i++) {
+            nodes[i].setMembership(tempMembership.getNodesCopy());
+        }
+
         LOGGER.log(Level.FINE, "Created {0} Paxos nodes.", this.numNodes);
     }
 
@@ -41,6 +52,7 @@ public class PaxosLayer {
         for (int i = 0; i < this.numNodes; i++) {
             this.nodes[i].start();
         }
+        LOGGER.log(Level.FINE, "All nodes started.");
     }
 
     /**

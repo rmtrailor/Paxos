@@ -4,6 +4,7 @@ package paxos;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.logging.*;
 
 public class PaxosNode {
@@ -15,6 +16,7 @@ public class PaxosNode {
     private final int numThreads;
     private boolean isRunning;
     private WorkQueue threadPool;
+    private Membership membership;
 
     public PaxosNode(int id) throws IOException {
         // Setup handler for logger
@@ -27,6 +29,7 @@ public class PaxosNode {
         this.id = id;
         this.port = 8000 + id;
         this.numThreads = 10;
+        this.membership = new Membership(this.id, this.port);
     }
 
     /**
@@ -59,6 +62,16 @@ public class PaxosNode {
 
     private void performJob(Socket sock) {
         // TODO: Parse request
+    }
+
+    /**
+     * Set the membership for this node. Automatically seals the membership so that
+     * no further nodes can be added.
+     * @param nodes The copy of nodes to add
+     */
+    public void setMembership(ArrayList<NodeInfo> nodes) {
+        this.membership.setNodes(nodes);
+        this.membership.setInitialized();
     }
 
     /**
