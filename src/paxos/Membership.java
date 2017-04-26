@@ -11,6 +11,7 @@ public class Membership {
     private ArrayList<NodeInfo> nodes;
     private ReadWriteLock lock;
     private boolean initialized;
+    private int numNodes;
 
     public Membership(int id, int port) {
         this.myInfo = new NodeInfo(id, port, "UP");
@@ -34,6 +35,7 @@ public class Membership {
     public void setInitialized() {
         lock.lockWrite();
         this.initialized = true;
+        this.numNodes = nodes.size();
         lock.unlockWrite();
     }
 
@@ -84,15 +86,33 @@ public class Membership {
         return nodesCopy;
     }
 
-    public int getId() {
+    /**
+     * Gets a copy of the requested node by id.
+     * @param id Id of the requested node
+     * @return Copy of the requested node. Null if not found.
+     */
+    public NodeInfo getNode(int id) {
+        lock.lockRead();
+        for (int i = 0; i < this.numNodes; i++) {
+            if (nodes.get(i).getId() == id) {
+                // return a copy of the node
+                lock.unlockRead();
+                return new NodeInfo(nodes.get(i).getId(), nodes.get(i).getPort(), nodes.get(i).getStatus());
+            }
+        }
+        lock.unlockRead();
+        return null;
+    }
+
+    public int getMyId() {
         return this.myInfo.getId();
     }
 
-    public int getPort() {
+    public int getMyPort() {
         return this.myInfo.getPort();
     }
 
-    public String getStatus() {
+    public String getMyStatus() {
         return this.myInfo.getStatus();
     }
 

@@ -1,10 +1,14 @@
 package paxos;
 
+import connection.Request;
+import org.json.simple.JSONObject;
+
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.logging.*;
 
 /**
- * This class will set up the layer for implementing Paxos and will accept requests
+ * Paxos Layer is the API layer used by the Client to communicate with Paxos nodes.
  */
 public class PaxosLayer {
 
@@ -12,6 +16,7 @@ public class PaxosLayer {
 
     private PaxosNode[] nodes;
     private final int numNodes;
+    private Membership membership;
 
     /**
      * Initializes the layer by setting up N nodes where N = numNodes
@@ -25,44 +30,46 @@ public class PaxosLayer {
         LOGGER.addHandler(handler);
         LOGGER.setLevel(Level.ALL);
 
-        // Setup the Paxos nodes
         this.numNodes = numNodes;
-        this.nodes = new PaxosNode[this.numNodes];
-        Membership tempMembership = new Membership(); // Temp membership to give all the new Paxos nodes
+        this.membership = new Membership();
 
-        for (int i = 0; i < this.numNodes; i++) {
-            nodes[i] = new PaxosNode(i);
-            tempMembership.createNode(i, 8000 + i, "UP");
-        }
+        // Hack-y membership creation
+        for (int i = 0; i < this.numNodes; i++)
+            this.membership.createNode(i, 8000 + i, "UP");
 
-        // Now that we've created all the Paxos nodes, we can give each node the finalized
-        // membership.
-        tempMembership.setInitialized(); // seal the membership
-        for (int i = 0; i < this.numNodes; i++) {
-            nodes[i].setMembership(tempMembership.getNodesCopy());
-        }
-
-        LOGGER.log(Level.FINE, "Created {0} Paxos nodes.", this.numNodes);
+        this.membership.setInitialized();
     }
 
-    /**
-     * API for starting all the Paxos nodes in the Paxos layer
-     */
-    public void startNodes() {
-        for (int i = 0; i < this.numNodes; i++) {
-            this.nodes[i].start();
-        }
-        LOGGER.log(Level.FINE, "All nodes started.");
-    }
 
     /**
      * API for sending a request to the Paxos nodes.
      * @param id The id of the Paxos node the client wishes to send a request to.
      */
-    public void sendRequest(int id) {
+    public JSONObject sendRequest(int id, int seqnum, int value) throws MalformedURLException {
+        JSONObject results = new JSONObject();
+
         if (id < 0 || id > numNodes) {
             // invalid id
+            results.put("success", "false");
+            results.put("err", "Invalid id");
+            return results;
         }
 
+        NodeInfo nodeCopy = this.membership.getNode(id);
+
+        if (nodeCopy == null) {
+            results.put("success", "false");
+            results.put("err", "Node not found");
+            return results;
+        }
+
+        JSONObject info = new JSONObject();
+        info.put("seqnum", seqnum);
+        info.put("value", value);
+
+        // Make the request and save the response
+        Request request = Communication.sendMessage(id, nodeCopy.getPort(), Communication.GET_VALUE, info);
+
+        return request.getContent();
     }
 }

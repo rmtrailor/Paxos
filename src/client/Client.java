@@ -1,8 +1,10 @@
 package client;
 
+import org.json.simple.JSONObject;
 import paxos.PaxosLayer;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -15,7 +17,10 @@ public class Client {
 
     private static Logger LOGGER = Logger.getLogger(Client.class.getName());
 
-    public static void main(String[] args) {
+    private final int numNodes;
+    private PaxosLayer layer;
+
+    public Client(int numNodes) {
         // Setup handler for logger
         ConsoleHandler handler = new ConsoleHandler();
         handler.setLevel(Level.ALL);
@@ -23,13 +28,23 @@ public class Client {
         LOGGER.addHandler(handler);
         LOGGER.setLevel(Level.ALL);
 
-        // Create paxos layer, the number of nodes is specified by the second argument
-        PaxosLayer layer = null;
+        // Create paxos layer
+        this.numNodes = numNodes;
+        this.layer = null;
+
         try {
-            layer = new PaxosLayer(Integer.parseInt(args[1]));
+            this.layer = new PaxosLayer(this.numNodes);
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, e.toString(), e);
         }
-        layer.startNodes();
+    }
+
+    /**
+     * Start the request sequence.
+     * @throws MalformedURLException
+     */
+    public void startRequests() throws MalformedURLException {
+        JSONObject req1 = this.layer.sendRequest(0, 1, 1);
+        System.out.println(req1.toString());
     }
 }

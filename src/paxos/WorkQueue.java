@@ -44,6 +44,29 @@ public class WorkQueue {
         }
     }
 
+    /**
+     * Sets the running to false and notifies the queue that the WorkQueue has been shutdown.
+     */
+    public void shutdown() {
+        running = false;
+        synchronized (queue) {
+            queue.notifyAll();
+        }
+    }
+
+    /**
+     * Joins each thread in the thread pool.
+     */
+    public void awaitTermination() {
+        for (Worker thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private class Worker extends Thread {
         public void run () {
             Runnable r;
