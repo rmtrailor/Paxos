@@ -12,6 +12,7 @@ public class Membership {
     private ReadWriteLock lock;
     private boolean initialized;
     private int numNodes;
+    private int quorum;
 
     public Membership(int id, int port) {
         this.myInfo = new NodeInfo(id, port, "UP");
@@ -36,6 +37,8 @@ public class Membership {
         lock.lockWrite();
         this.initialized = true;
         this.numNodes = nodes.size();
+        this.quorum = Math.floorDiv(this.numNodes, 2) + 1;
+        System.out.println("Quorum: " + this.quorum);
         lock.unlockWrite();
     }
 
@@ -102,6 +105,11 @@ public class Membership {
         }
         lock.unlockRead();
         return null;
+    }
+
+    public int getQuorum() {
+        if (!this.initialized) return -1;
+        return this.quorum;
     }
 
     public int getMyId() {
