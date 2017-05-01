@@ -48,7 +48,7 @@ public class Communication {
                     break;
                 // Used by a Proposer Paxos Node to propose a new value
                 case PROPOSE_VALUE:
-                    params = "?seqnum=" + info.get("seqnum") + "&value=" + info.get("value");
+                    params = "?seqnum=" + info.get("seqnum");
                     url = new URL(DOMAIN + port + API + PROPOSE_VALUE + params);
                     request = new Request(url);
                     break;

@@ -29,6 +29,8 @@ public class PaxosNode {
     private boolean isRunning;
     private WorkQueue threadPool;
     private Membership membership;
+    private ReadWriteLock lock;
+    private Log log;
 
     public PaxosNode(int id) throws IOException {
         // Setup handler for logger
@@ -41,13 +43,15 @@ public class PaxosNode {
         this.id = id;
         this.port = 8000 + id;
         this.numThreads = 10;
+        this.lock = new ReadWriteLock();
+        this.log = new Log();
 
         // TODO: Give basic membership based on number of nodes, then set initialized
         this.membership = new Membership(this.id, this.port);
 
         // Hack-y membership creation
-        // Change the 2 later
-        for (int i = 0; i < 2; i++)
+        // Change the 3 later
+        for (int i = 0; i < 3; i++)
             this.membership.createNode(i, 8000 + i, "UP");
 
         this.membership.setInitialized();
@@ -94,11 +98,14 @@ public class PaxosNode {
 
     /**
      * Job that the node worker must complete. In this case, it must handle the given request.
+     * We use a lock here to serialize the Paxos node. Therefore, only one job can be completed at any given time.
      * @param sock Node socket
      */
     private void performJob(Socket sock) {
         try {
+            lock.lockWrite();
             getRequest(sock);
+            lock.unlockWrite();
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, e.toString(), e);
         }
@@ -189,12 +196,10 @@ public class PaxosNode {
                 content = proposeValue(seqnum, value);
                 break;
             case Communication.PROPOSE_VALUE:
-                LOGGER.log(Level.FINE, "Got a proposal for consensus on value: {0}, with seq num: {1}",
-                        new Object[] {Integer.parseInt(m.group(4).split("=")[1]), Integer.parseInt(m.group(5).split("=")[1])});
+                LOGGER.log(Level.FINE, "Got a proposal for seq num: {0}", m.group(4).split("=")[1]);
 
-                // For now just agree to the value
-                content.put("success", "true");
-                content.put("reply", "agree");
+                content = this.log.promiseSeqnum(Integer.parseInt(m.group(4).split("=")[1]));
+                LOGGER.log(Level.FINE, "Response: {0}" + content.toString());
                 break;
             default:
                 // If we've reached here then 404 not found
@@ -228,20 +233,19 @@ public class PaxosNode {
 
             if (request.getContent().get("success").equals("true") && request.getContent().get("reply").equals("agree"))
                 numAgrees++;
+
+            // Check for quorum is in for-loop to optimize, since we only need the quorum of promises
+            if (numAgrees >= this.membership.getQuorum()) {
+                // TODO: Go to accept phase
+            }
         }
 
-        if (numAgrees >= this.membership.getQuorum()) {
-            results.put("success", "true");
-            results.put("AcceptedValue", value);
-            results.put("AcceptedSeqNum", seqnum);
-        }
-        else {
-            results.put("success", "false");
-            results.put("err", "Value was not agreed upon");
-        }
-
+        // If we get here then we did not get an agreed upon value
+        results.put("success", "false");
+        results.put("err", "Value was not agreed upon");
         return results;
     }
+
 
     /**
      * Set the membership for this node. Automatically seals the membership so that
