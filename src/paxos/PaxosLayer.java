@@ -13,7 +13,7 @@ import java.util.logging.*;
 public class PaxosLayer {
 
     private static Logger LOGGER = Logger.getLogger(PaxosLayer.class.getName());
-    
+
     private final int numNodes;
     private Membership membership;
 

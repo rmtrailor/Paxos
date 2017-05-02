@@ -73,14 +73,14 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
-        if (seqnum < this.getHighestSeqnumInLog()) {
+        if (seqnum < this.getHighestSeqnumInLog() || seqnum < promisedSeqnum) {
             // Ignore request
             response.put("success", "true");
             response.put("reply", "rejected");
         }
         else {
             // Accept this value
-            log.put(seqnum, value);
+            this.log.put(seqnum, value);
             response.put("success", "true");
             response.put("reply", "accepted");
         }

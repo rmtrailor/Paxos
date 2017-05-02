@@ -45,6 +45,12 @@ public class Client {
      */
     public void startRequests() throws MalformedURLException {
         JSONObject req1 = this.layer.sendRequest(0, 1, 1);
+        JSONObject req2 = this.layer.sendRequest(1, 0, 2);
+        JSONObject req3 = this.layer.sendRequest(2, 2, 4);
+        JSONObject req4 = this.layer.sendRequest(1, 0, 2);
         System.out.println(req1.toString());
+        System.out.println(req2.toString());
+        System.out.println(req3.toString());
+        System.out.println(req4.toString());
     }
 }
