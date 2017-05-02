@@ -15,8 +15,9 @@ public class Communication {
 
     // Node API
     public static final String API = "/api/";
-    public static final String SEND_VALUE = "send.value";
-    public static final String PROPOSE_VALUE = "propose.value";
+    public static final String SEND_VALUE = "value.send";
+    public static final String PROPOSE_SEQNUM = "value.propose";
+    public static final String ACCEPT_VALUE = "value.accept";
 
     // Messaging API
     public static final String GET_VALUE = "GET_VALUE";
@@ -46,15 +47,23 @@ public class Communication {
                     url = new URL(DOMAIN + port + API + SEND_VALUE + params);
                     request = new Request(url);
                     break;
-                // Used by a Proposer Paxos Node to propose a new value
-                case PROPOSE_VALUE:
+                // Used by a Proposer Paxos Node to propose a new seqnum
+                case PROPOSE_SEQNUM:
                     params = "?seqnum=" + info.get("seqnum");
-                    url = new URL(DOMAIN + port + API + PROPOSE_VALUE + params);
+                    url = new URL(DOMAIN + port + API + PROPOSE_SEQNUM + params);
+                    request = new Request(url);
+                    break;
+                // Used by a Proposer Paxos Node to send out an accept message on a value
+                case ACCEPT_VALUE:
+                    params = "?seqnum=" + info.get("seqnum") + "&value=" + info.get("value");
+                    url = new URL(DOMAIN + port + API + ACCEPT_VALUE + params);
                     request = new Request(url);
                     break;
                 default:
                     request = null;
             }
+
+            if (request == null) continue;
 
             // If we weren't able to get a response, attempt again
             if (request.getContent().get("success").equals("false"))

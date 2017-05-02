@@ -1,6 +1,7 @@
 package paxos;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Data structure for Paxos nodes to keep track of basic membership
@@ -8,7 +9,7 @@ import java.util.ArrayList;
 public class Membership {
 
     private NodeInfo myInfo;
-    private ArrayList<NodeInfo> nodes;
+    private List<NodeInfo> nodes;
     private ReadWriteLock lock;
     private boolean initialized;
     private int numNodes;
@@ -62,7 +63,7 @@ public class Membership {
      * Adds a group of nodes
      * @param nodes Copy of a group of nodes
      */
-    public void setNodes(ArrayList<NodeInfo> nodes) {
+    public void setNodes(List<NodeInfo> nodes) {
         lock.lockWrite();
         if (initialized) {
             lock.unlockWrite();
@@ -79,9 +80,9 @@ public class Membership {
      * Creates a deep copy of the nodes in the membership
      * @return Deep copy of the nodes in the membership
      */
-    public ArrayList<NodeInfo> getNodesCopy() {
+    public List<NodeInfo> getNodesCopy() {
         lock.lockRead();
-        ArrayList<NodeInfo> nodesCopy = new ArrayList<>();
+        List<NodeInfo> nodesCopy = new ArrayList<>();
         for (NodeInfo node: this.nodes) {
             nodesCopy.add(new NodeInfo(node.getId(), node.getPort(), node.getStatus()));
         }

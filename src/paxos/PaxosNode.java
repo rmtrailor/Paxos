@@ -12,6 +12,7 @@ import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -193,13 +194,22 @@ public class PaxosNode {
                 LOGGER.log(Level.FINE, "Got request from client for consensus on value: {0}, with seq num: {1}",
                         new Object[] {value, seqnum});
 
-                content = proposeValue(seqnum, value);
+                content = proposalPhase(seqnum, value);
                 break;
-            case Communication.PROPOSE_VALUE:
+            case Communication.PROPOSE_SEQNUM:
                 LOGGER.log(Level.FINE, "Got a proposal for seq num: {0}", m.group(4).split("=")[1]);
 
                 content = this.log.promiseSeqnum(Integer.parseInt(m.group(4).split("=")[1]));
-                LOGGER.log(Level.FINE, "Response: {0}" + content.toString());
+                LOGGER.log(Level.FINE, "Response: {0}", content.toString());
+                break;
+            case Communication.ACCEPT_VALUE:
+                LOGGER.log(Level.FINE, "Got an accept request for seq num: {0} for value {1}",
+                        new Object[] { m.group(4).split("=")[1], m.group(5).split("=")[1] });
+
+                content = this.log.acceptValue(Integer.parseInt(m.group(4).split("=")[1]),
+                        Integer.parseInt(m.group(5).split("=")[1]));
+
+                LOGGER.log(Level.FINE, "Response: {0}", content.toString());
                 break;
             default:
                 // If we've reached here then 404 not found
@@ -211,33 +221,32 @@ public class PaxosNode {
     }
 
     /**
-     * Function to propose a value to the other paxos nodes
+     * Function to start proposal phase of paxos protocal to propose a seqnum to the other paxos nodes
      * @param seqnum Given sequence number
      * @param value Value to be agreed upon
      * @return  Results - whether or not the value was agreed upon
      * @throws MalformedURLException
      */
-    private JSONObject proposeValue(int seqnum, int value) throws MalformedURLException {
-        ArrayList<NodeInfo> nodes = this.membership.getNodesCopy();
+    private JSONObject proposalPhase(int seqnum, int value) throws MalformedURLException {
+        List<NodeInfo> nodes = this.membership.getNodesCopy();
         JSONObject results = new JSONObject();
-        int numAgrees = 1;
+        int numAgrees = 0;
 
         JSONObject info = new JSONObject();
         info.put("seqnum", seqnum);
-        info.put("value", value);
 
         for (NodeInfo node : nodes) {
             if (node.getId() == this.id) continue;
 
-            Request request = Communication.sendMessage(node.getId(), node.getPort(), Communication.PROPOSE_VALUE, info);
+            Request request = Communication.sendMessage(node.getId(), node.getPort(), Communication.PROPOSE_SEQNUM, info);
 
             if (request.getContent().get("success").equals("true") && request.getContent().get("reply").equals("agree"))
                 numAgrees++;
 
             // Check for quorum is in for-loop to optimize, since we only need the quorum of promises
-            if (numAgrees >= this.membership.getQuorum()) {
-                // TODO: Go to accept phase
-            }
+            if (numAgrees >= this.membership.getQuorum())
+                return acceptPhase(seqnum, value);
+
         }
 
         // If we get here then we did not get an agreed upon value
@@ -246,13 +255,50 @@ public class PaxosNode {
         return results;
     }
 
+    /**
+     * Function to start accept phase of paxos protocal to request acceptance of a seqnum with a corresponding value.
+     * @param seqnum Given sequence number
+     * @param value Given value
+     * @return Results - whether or not a value was accepted
+     * @throws MalformedURLException
+     */
+    private JSONObject acceptPhase(int seqnum, int value) throws MalformedURLException {
+        List<NodeInfo> nodes = this.membership.getNodesCopy();
+        JSONObject results = new JSONObject();
+        int numAccepts = 0;
+
+        JSONObject info = new JSONObject();
+        info.put("seqnum", seqnum);
+        info.put("value", value);
+
+        for (NodeInfo node: nodes) {
+            if (node.getId() == this.id) continue;
+
+            Request request = Communication.sendMessage(node.getId(), node.getPort(), Communication.ACCEPT_VALUE, info);
+
+            if (request.getContent().get("success").equals("true") && request.getContent().get("reply").equals("accepted"))
+                numAccepts++;
+
+            // Optimize again
+            if (numAccepts >= this.membership.getQuorum()) {
+                results.put("success", "true");
+                results.put("msg", "Value accepted");
+                return results;
+            }
+        }
+
+        // If we get here then we did not get an accepted value
+        results.put("success", "false");
+        results.put("err", "Value was not accepted");
+        return results;
+    }
 
     /**
      * Set the membership for this node. Automatically seals the membership so that
      * no further nodes can be added.
      * @param nodes The copy of nodes to add
      */
-    public void setMembership(ArrayList<NodeInfo> nodes) {
+    public void setMembership(List<NodeInfo> nodes) {
         this.membership.setNodes(nodes);
         this.membership.setInitialized();
     }

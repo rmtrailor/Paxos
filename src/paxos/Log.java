@@ -4,6 +4,7 @@ import org.json.simple.JSONObject;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -11,7 +12,7 @@ import java.util.Set;
  */
 public class Log {
 
-    private HashMap<Integer, Integer> log;
+    private Map<Integer, Integer> log;
     private ReadWriteLock lock;
     private int promisedSeqnum;
     private int acceptedSeqnum;
@@ -29,7 +30,7 @@ public class Log {
      * @return The highest number or -1 if the log is empty
      */
     private int getHighestSeqnumInLog() {
-        Set<Integer> seqnums = log.keySet();
+        Set<Integer> seqnums = this.log.keySet();
         if (seqnums.size() < 1) return -1;
 
         return Collections.max(seqnums);
@@ -44,6 +45,8 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
+        // TODO: send back accepted value at some point
+
         if (seqnum < this.getHighestSeqnumInLog() || seqnum < promisedSeqnum) {
             // We can ignore this value
             response.put("success", "true");
@@ -51,9 +54,35 @@ public class Log {
         }
         else {
             // Promise this value
-            promisedSeqnum = seqnum;
+            this.promisedSeqnum = seqnum;
             response.put("success", "true");
             response.put("reply", "agree");
+        }
+
+        lock.unlockWrite();
+        return response;
+    }
+
+    /**
+     * Function to run the accept aspect of the log
+     * @param seqnum Sequence number to accept
+     * @param value  Value to accept
+     * @return Response which details either an accept or reject
+     */
+    public JSONObject acceptValue(int seqnum, int value) {
+        lock.lockWrite();
+        JSONObject response = new JSONObject();
+
+        if (seqnum < this.getHighestSeqnumInLog()) {
+            // Ignore request
+            response.put("success", "true");
+            response.put("reply", "rejected");
+        }
+        else {
+            // Accept this value
+            log.put(seqnum, value);
+            response.put("success", "true");
+            response.put("reply", "accepted");
         }
 
         lock.unlockWrite();
