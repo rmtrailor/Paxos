@@ -4,6 +4,7 @@ package paxos;
 import connection.Request;
 import connection.Response;
 import org.json.simple.JSONObject;
+import org.w3c.dom.Node;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -211,6 +212,12 @@ public class PaxosNode {
 
                 LOGGER.log(Level.FINE, "Response: {0}", content.toString());
                 break;
+            case Communication.COMMIT:
+                LOGGER.log(Level.FINE, "Got a commit request");
+
+                content = this.log.commitValue(Integer.parseInt(m.group(4).split("=")[1]),
+                        Integer.parseInt(m.group(5).split("=")[1]));
+                break;
             default:
                 // If we've reached here then 404 not found
                 content.put("success", "false");
@@ -235,6 +242,8 @@ public class PaxosNode {
         JSONObject info = new JSONObject();
         info.put("seqnum", seqnum);
 
+        List<JSONObject> prevAcceptedVals = new ArrayList<>();
+
         for (NodeInfo node : nodes) {
             if (node.getId() == this.id) continue;
 
@@ -243,15 +252,30 @@ public class PaxosNode {
             if (request.getContent().get("success").equals("true") && request.getContent().get("reply").equals("agree"))
                 numAgrees++;
 
+            // This is done if we got a value sent back to the proposer
+            if (request.getContent().get("seqnum") != null) {
+                JSONObject newValue = new JSONObject();
+                newValue.put("seqnum", request.getContent().get("seqnum"));
+                newValue.put("value", request.getContent().get("value"));
+                prevAcceptedVals.add(newValue);
+            }
+
             // Check for quorum is in for-loop to optimize, since we only need the quorum of promises
-            if (numAgrees >= this.membership.getQuorum())
+            if (numAgrees >= this.membership.getQuorum()) {
+                // If any values were sent back, pick the last value that was added (arbitrary decision)
+                if (prevAcceptedVals.size() > 0) {
+                    seqnum = Integer.parseInt(prevAcceptedVals.get(prevAcceptedVals.size() - 1).get("seqnum").toString());
+                    value = Integer.parseInt(prevAcceptedVals.get(prevAcceptedVals.size() - 1).get("value").toString());
+                }
+
                 return acceptPhase(seqnum, value);
+            }
 
         }
 
         // If we get here then we did not get an agreed upon value
         results.put("success", "false");
-        results.put("err", "Value was not agreed upon");
+        results.put("err", "Rejected Seqnum {" + seqnum + "} Value {" + value + "}");
         return results;
     }
 
@@ -281,8 +305,11 @@ public class PaxosNode {
 
             // Optimize again
             if (numAccepts >= this.membership.getQuorum()) {
+                // Ask nodes to commit any values since we've done a successful accept run
+                commitPhase(nodes, info);
+
                 results.put("success", "true");
-                results.put("msg", "Value accepted");
+                results.put("msg", "Committed Seqnum {" + seqnum + "} Value {" + value + "}");
                 return results;
             }
         }
@@ -291,6 +318,21 @@ public class PaxosNode {
         results.put("success", "false");
         results.put("err", "Value was not accepted");
         return results;
+    }
+
+    /**
+     * Sends a commit message to all nodes in membership to log the seqnum and value.
+     * @param nodes Nodes in membership
+     * @param info Info about seqnum and value
+     * @throws MalformedURLException
+     */
+    private void commitPhase(List<NodeInfo> nodes, JSONObject info) throws MalformedURLException {
+
+        for (NodeInfo node : nodes) {
+            if (node.getId() == this.id) continue;
+
+            Communication.sendMessage(node.getId(), node.getPort(), Communication.COMMIT, info);
+        }
     }
 
     /**

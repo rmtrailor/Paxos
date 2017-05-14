@@ -18,6 +18,7 @@ public class Communication {
     public static final String SEND_VALUE = "value.send";
     public static final String PROPOSE_SEQNUM = "value.propose";
     public static final String ACCEPT_VALUE = "value.accept";
+    public static final String COMMIT = "value.commit";
 
     // Messaging API
     public static final String GET_VALUE = "GET_VALUE";
@@ -57,6 +58,12 @@ public class Communication {
                 case ACCEPT_VALUE:
                     params = "?seqnum=" + info.get("seqnum") + "&value=" + info.get("value");
                     url = new URL(DOMAIN + port + API + ACCEPT_VALUE + params);
+                    request = new Request(url);
+                    break;
+                // Used by a Proposer to send a commit message to other nodes
+                case COMMIT:
+                    params = "?seqnum=" + info.get("seqnum") + "&value=" + info.get("value");
+                    url = new URL(DOMAIN + port + API + COMMIT + params);
                     request = new Request(url);
                     break;
                 default:

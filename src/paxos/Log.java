@@ -45,12 +45,18 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
-        // TODO: send back accepted value at some point
-
-        if (seqnum < this.getHighestSeqnumInLog() || seqnum < promisedSeqnum) {
+        if (seqnum < this.getHighestSeqnumInLog() || seqnum < this.promisedSeqnum) {
             // We can ignore this value
             response.put("success", "true");
             response.put("reply", "rejected");
+        }
+        // True if this node has a previously accepted seqnum w/ value
+        else if (this.acceptedSeqnum != -1) {
+            System.out.println("ACCEPTED VALUE: " + this.acceptedSeqnum);
+            response.put("success", "true");
+            response.put("reply", "agree");
+            response.put("seqnum", this.acceptedSeqnum);
+            response.put("value", this.acceptedValue);
         }
         else {
             // Promise this value
@@ -73,19 +79,42 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
-        if (seqnum < this.getHighestSeqnumInLog() || seqnum < promisedSeqnum) {
+        if (seqnum < this.getHighestSeqnumInLog() || seqnum < this.promisedSeqnum) {
             // Ignore request
             response.put("success", "true");
             response.put("reply", "rejected");
         }
         else {
             // Accept this value
-            this.log.put(seqnum, value);
+            this.acceptedSeqnum = seqnum;
+            this.acceptedValue = value;
             response.put("success", "true");
             response.put("reply", "accepted");
         }
 
         lock.unlockWrite();
+        return response;
+    }
+
+    public JSONObject commitValue(int seqnum, int value) {
+        lock.lockWrite();
+        JSONObject response = new JSONObject();
+
+        System.out.println("Committed: " + "Seqnum(" + seqnum + ") Value(" + value + ")");
+        this.log.put(seqnum, value);
+
+        // Reset values if we committed our promised value
+        if (promisedSeqnum == seqnum) {
+            this.promisedSeqnum = -1;
+        }
+        if (acceptedSeqnum == seqnum) {
+            this.acceptedValue = -1;
+            this.acceptedSeqnum = -1;
+        }
+
+        lock.unlockWrite();
+
+        response.put("success", "true");
         return response;
     }
 }
