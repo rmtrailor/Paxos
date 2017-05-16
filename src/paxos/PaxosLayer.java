@@ -48,17 +48,35 @@ public class PaxosLayer {
      * @param value The value the client application is requesting consensus on
      */
     public JSONObject sendRequest(int value) throws MalformedURLException {
+
+        if (this.membership.getNumDown() > this.membership.getQuorum()) {
+            JSONObject response = new JSONObject();
+            response.put("success", "false");
+            response.put("err", "Number of nodes down is more than quorum needed");
+            return response;
+        }
+
         // For our use, we'll just select a paxos node at random to save us from any
         // complicated overhead.
-        int nodeId = rand.nextInt(3);
+        int nodeId = rand.nextInt(this.numNodes);
         NodeInfo nodeCopy = this.membership.getNode(nodeId);
+
+        // Try to not get a down paxos node
+        while (nodeCopy.getStatus().equals("DOWN")) {
+            nodeId = rand.nextInt(this.numNodes);
+            nodeCopy = this.membership.getNode(nodeId);
+        }
 
         JSONObject info = new JSONObject();
         info.put("value", value);
 
-        // Make the request and save the response
         Request request = Communication.sendMessage(nodeId, nodeCopy.getPort(), Communication.GET_VALUE, info);
 
-        return request.getContent();
+        if (request != null && request.getContent().get("err") != null && request.getContent().get("err").equals("No response")) {
+            this.membership.getNode(nodeId).setStatus("DOWN");
+            this.membership.updateNumDown();
+        }
+
+        return request != null ? request.getContent() : null;
     }
 }

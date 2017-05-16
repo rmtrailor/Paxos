@@ -55,9 +55,24 @@ public class Log {
         int highestSoFar = this.getHighestSeqnumInLog();
         int newSeqnum = highestSoFar + 1; // try one more than what we've seen which sometimes saves time from generating
 
-        while ((newSeqnum % this.numNodes) != this.id) {
+        while ((newSeqnum % this.numNodes) != this.id)
             newSeqnum++;
-        }
+
+        lock.unlockRead();
+        return newSeqnum;
+    }
+
+    /**
+     * Generates a new seqnum using a previously rejected seqnum as a starting point rather than the highest known.
+     * @param lastUsedSeqnum
+     * @return
+     */
+    public int generateNextSeqnum(int lastUsedSeqnum) {
+        lock.lockRead();
+        int newSeqnum = lastUsedSeqnum + 1;
+
+        while ((newSeqnum % this.numNodes) != this.id)
+            newSeqnum++;
 
         lock.unlockRead();
         return newSeqnum;
@@ -79,7 +94,7 @@ public class Log {
         }
         // True if this node has a previously accepted seqnum w/ value
         else if (this.acceptedSeqnum != -1) {
-            System.out.println("ACCEPTED VALUE: " + this.acceptedSeqnum);
+            System.out.println("ACCEPTED VALUE: " + this.acceptedValue);
             response.put("success", "true");
             response.put("reply", "agree");
             response.put("seqnum", this.acceptedSeqnum);
@@ -134,14 +149,23 @@ public class Log {
         if (promisedSeqnum == seqnum) {
             this.promisedSeqnum = -1;
         }
-        if (acceptedSeqnum == seqnum) {
+        if (acceptedValue == value) {
             this.acceptedValue = -1;
             this.acceptedSeqnum = -1;
         }
+
+        System.out.println("Log after committing:\n" + this.log.toString());
 
         lock.unlockWrite();
 
         response.put("success", "true");
         return response;
+    }
+
+    @Override
+    public String toString() {
+        return "Log{" +
+                "log=" + log +
+                '}';
     }
 }

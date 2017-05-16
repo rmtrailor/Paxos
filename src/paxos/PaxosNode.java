@@ -44,7 +44,7 @@ public class PaxosNode {
 
         this.id = id;
         this.port = 8000 + id;
-        this.numNodes = 3; // Default membership to this number of nodes
+        this.numNodes = 5; // Default membership to this number of nodes
         this.numThreads = 10;
         this.lock = new ReadWriteLock();
         this.log = new Log(this.id, this.numNodes);
@@ -191,10 +191,34 @@ public class PaxosNode {
             case Communication.SEND_VALUE:
                 int value = Integer.parseInt(m.group(4).split("=")[1]);
                 int seqnum = this.log.generateNextSeqnum();
+                int numAttempts = 0;
+                int MAX_ATTEMPTS = 5;
+                // * TEST *
+                // If value = 1111, then we'll test a rejected sequence number. We'll just use -1 for an example.
+                if (value == 1111) {
+                    System.out.println("Testing rejected sequence number. Using seqnum = -1");
+                    seqnum = -1;
+                }
+
                 LOGGER.log(Level.FINE, "Got request from client for consensus on value: {0}, attempting with seq num: {1}",
                         new Object[] {value, seqnum});
 
-                content = proposalPhase(seqnum, value);
+                // Will try multiple times for committing on value
+                while (numAttempts < MAX_ATTEMPTS) {
+
+                    // If we're trying again, then we need to use the previously failed seqnum so that way we make sure
+                    // the next seqnum we generate is higher than what we just tried
+                    if (numAttempts > 1)
+                        seqnum = this.log.generateNextSeqnum(seqnum);
+
+                    content = proposalPhase(seqnum, value);
+
+                    if (content == null || content.get("success").equals("false"))
+                        numAttempts++;
+                    else
+                        break;
+                }
+
                 break;
             case Communication.PROPOSE_SEQNUM:
                 LOGGER.log(Level.FINE, "Got a proposal for seq num: {0}", m.group(4).split("=")[1]);
@@ -237,6 +261,8 @@ public class PaxosNode {
         List<NodeInfo> nodes = this.membership.getNodesCopy();
         JSONObject results = new JSONObject();
         int numAgrees = 0;
+        int testCount = 0; // For testing proposer failure
+        boolean usingNewValue = false; // This is used so that way we can check if we are using a new value
 
         JSONObject info = new JSONObject();
         info.put("seqnum", seqnum);
@@ -245,6 +271,7 @@ public class PaxosNode {
 
         for (NodeInfo node : nodes) {
             if (node.getId() == this.id) continue;
+            testCount++;
 
             Request request = Communication.sendMessage(node.getId(), node.getPort(), Communication.PROPOSE_SEQNUM, info);
 
@@ -259,15 +286,25 @@ public class PaxosNode {
                 prevAcceptedVals.add(newValue);
             }
 
+            // * TEST *
+            // If value = 1010, then we'll test proposer failure during proposal phase
+            // The choice to fail after 2nd node receives proposal was arbitrary
+            if (value == 1010 && testCount >= 2) {
+                System.out.println("Testing failure during proposal phase. Exiting... ");
+                System.exit(1);
+            }
+
             // Check for quorum is in for-loop to optimize, since we only need the quorum of promises
             if (numAgrees >= this.membership.getQuorum()) {
                 // If any values were sent back, pick the last value that was added (arbitrary decision)
                 if (prevAcceptedVals.size() > 0) {
-                    seqnum = Integer.parseInt(prevAcceptedVals.get(prevAcceptedVals.size() - 1).get("seqnum").toString());
+                    //seqnum = Integer.parseInt(prevAcceptedVals.get(prevAcceptedVals.size() - 1).get("seqnum").toString());
                     value = Integer.parseInt(prevAcceptedVals.get(prevAcceptedVals.size() - 1).get("value").toString());
+                    System.out.println("Using seqnum {" + seqnum + "} with New value {" + value + "}");
+                    usingNewValue = true;
                 }
 
-                return acceptPhase(seqnum, value);
+                return acceptPhase(seqnum, value, usingNewValue);
             }
 
         }
@@ -285,7 +322,7 @@ public class PaxosNode {
      * @return Results - whether or not a value was accepted
      * @throws MalformedURLException
      */
-    private JSONObject acceptPhase(int seqnum, int value) throws MalformedURLException {
+    private JSONObject acceptPhase(int seqnum, int value, boolean usingNewValue) throws MalformedURLException {
         List<NodeInfo> nodes = this.membership.getNodesCopy();
         JSONObject results = new JSONObject();
         int numAccepts = 0;
@@ -304,6 +341,15 @@ public class PaxosNode {
 
             // Optimize again
             if (numAccepts >= this.membership.getQuorum()) {
+
+                // * TEST *
+                // If value = 1001, then we'll test proposer failure during commit phase
+                // We'll also only perform this test if we are NOTE using a new value
+                if (Integer.parseInt(info.get("value").toString()) == 1001 && !usingNewValue) {
+                    System.out.println("Testing failure during commit phase. Exiting... ");
+                    System.exit(1);
+                }
+
                 // Ask nodes to commit any values since we've done a successful accept run
                 commitPhase(nodes, info);
 
@@ -326,6 +372,7 @@ public class PaxosNode {
      * @throws MalformedURLException
      */
     private void commitPhase(List<NodeInfo> nodes, JSONObject info) throws MalformedURLException {
+        this.log.commitValue(Integer.parseInt(info.get("seqnum").toString()), Integer.parseInt(info.get("value").toString()));
 
         for (NodeInfo node : nodes) {
             if (node.getId() == this.id) continue;

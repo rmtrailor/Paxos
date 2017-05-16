@@ -14,10 +14,12 @@ public class Membership {
     private boolean initialized;
     private int numNodes;
     private int quorum;
+    private int numDown;
 
     public Membership(int id, int port) {
         this.myInfo = new NodeInfo(id, port, "UP");
         this.nodes = new ArrayList<>();
+        this.numDown = 0;
         this.lock = new ReadWriteLock();
         this.initialized = false;
     }
@@ -111,6 +113,18 @@ public class Membership {
     public int getQuorum() {
         if (!this.initialized) return -1;
         return this.quorum;
+    }
+
+    /**
+     * Updates the number of down paxos nodes by 1 and returns the new number
+     * @return The new number of down paxos nodes
+     */
+    public int updateNumDown() {
+        return ++this.numDown;
+    }
+
+    public int getNumDown() {
+        return this.numDown;
     }
 
     public int getMyId() {

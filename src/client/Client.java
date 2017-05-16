@@ -61,8 +61,10 @@ public class Client {
         System.out.println("Can now test user inputted values:");
         String value = userInput.nextLine();
 
-        while (!value.toLowerCase().equals("stop")) {
-            System.out.println(this.layer.sendRequest(Integer.parseInt(value)));
+        while (!value.toLowerCase().equals("exit") && !value.toLowerCase().equals("stop")) {
+            if (!value.equals("")) {
+                System.out.println(this.layer.sendRequest(Integer.parseInt(value)));
+            }
             value = userInput.nextLine();
         }
         System.out.println("Client test finished. Bye!");
