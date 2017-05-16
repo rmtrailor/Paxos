@@ -4,7 +4,6 @@ package paxos;
 import connection.Request;
 import connection.Response;
 import org.json.simple.JSONObject;
-import org.w3c.dom.Node;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -27,6 +26,7 @@ public class PaxosNode {
 
     private final int id;
     private final int port;
+    private final int numNodes;
     private final int numThreads;
     private boolean isRunning;
     private WorkQueue threadPool;
@@ -44,16 +44,16 @@ public class PaxosNode {
 
         this.id = id;
         this.port = 8000 + id;
+        this.numNodes = 3; // Default membership to this number of nodes
         this.numThreads = 10;
         this.lock = new ReadWriteLock();
-        this.log = new Log();
+        this.log = new Log(this.id, this.numNodes);
 
         // TODO: Give basic membership based on number of nodes, then set initialized
         this.membership = new Membership(this.id, this.port);
 
         // Hack-y membership creation
-        // Change the 3 later
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < this.numNodes; i++)
             this.membership.createNode(i, 8000 + i, "UP");
 
         this.membership.setInitialized();
@@ -189,10 +189,9 @@ public class PaxosNode {
 
         switch (method) {
             case Communication.SEND_VALUE:
-                int seqnum = Integer.parseInt(m.group(4).split("=")[1]);
-                int value = Integer.parseInt(m.group(5).split("=")[1]);
-
-                LOGGER.log(Level.FINE, "Got request from client for consensus on value: {0}, with seq num: {1}",
+                int value = Integer.parseInt(m.group(4).split("=")[1]);
+                int seqnum = this.log.generateNextSeqnum();
+                LOGGER.log(Level.FINE, "Got request from client for consensus on value: {0}, attempting with seq num: {1}",
                         new Object[] {value, seqnum});
 
                 content = proposalPhase(seqnum, value);

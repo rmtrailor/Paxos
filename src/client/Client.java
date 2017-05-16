@@ -5,6 +5,7 @@ import paxos.PaxosLayer;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.Scanner;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -44,13 +45,26 @@ public class Client {
      * @throws MalformedURLException
      */
     public void startRequests() throws MalformedURLException {
-        JSONObject req1 = this.layer.sendRequest(0, 1, 1);
-        JSONObject req2 = this.layer.sendRequest(1, 0, 2);
-        JSONObject req3 = this.layer.sendRequest(2, 2, 4);
-        JSONObject req4 = this.layer.sendRequest(1, 0, 2);
+        JSONObject req1 = this.layer.sendRequest(1);
+        JSONObject req2 = this.layer.sendRequest(2);
+        JSONObject req3 = this.layer.sendRequest(4);
+        JSONObject req4 = this.layer.sendRequest(2);
         System.out.println(req1.toString());
         System.out.println(req2.toString());
         System.out.println(req3.toString());
         System.out.println(req4.toString());
+        inputRequests();
+    }
+
+    public void inputRequests() throws MalformedURLException {
+        Scanner userInput = new Scanner(System.in);
+        System.out.println("Can now test user inputted values:");
+        String value = userInput.nextLine();
+
+        while (!value.toLowerCase().equals("stop")) {
+            System.out.println(this.layer.sendRequest(Integer.parseInt(value)));
+            value = userInput.nextLine();
+        }
+        System.out.println("Client test finished. Bye!");
     }
 }

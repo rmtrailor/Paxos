@@ -13,13 +13,17 @@ import java.util.Set;
 public class Log {
 
     private Map<Integer, Integer> log;
+    private int id;
+    private int numNodes;
     private ReadWriteLock lock;
     private int promisedSeqnum;
     private int acceptedSeqnum;
     private int acceptedValue;
 
-    public Log() {
+    public Log(int id, int numNodes) {
         this.log = new HashMap<>();
+        this.id = id;
+        this.numNodes = numNodes;
         this.lock = new ReadWriteLock();
         this.promisedSeqnum = -1;
         this.acceptedSeqnum = -1;
@@ -37,6 +41,29 @@ public class Log {
     }
 
     /**
+     * Generates a new seqnum that is higher than the highest sequence number this node has seen.
+     * Uses "Paxos Made Live" paper's method of generating a new sequence number: s mod n = i
+     * Where:
+     *      s = the smallest sequence to generate
+     *      n = the number of paxos nodes
+     *      i = the id of this paxos node
+     *
+     * @return New sequence number
+     */
+    public int generateNextSeqnum() {
+        lock.lockRead();
+        int highestSoFar = this.getHighestSeqnumInLog();
+        int newSeqnum = highestSoFar + 1; // try one more than what we've seen which sometimes saves time from generating
+
+        while ((newSeqnum % this.numNodes) != this.id) {
+            newSeqnum++;
+        }
+
+        lock.unlockRead();
+        return newSeqnum;
+    }
+
+    /**
      * Function to run the promise aspect of the log
      * @param seqnum Proposed sequence number
      * @return Response which details either an accept or reject
@@ -45,7 +72,7 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
-        if (seqnum < this.getHighestSeqnumInLog() || seqnum < this.promisedSeqnum) {
+        if (seqnum <= this.getHighestSeqnumInLog() || seqnum <= this.promisedSeqnum) {
             // We can ignore this value
             response.put("success", "true");
             response.put("reply", "rejected");
@@ -79,7 +106,7 @@ public class Log {
         lock.lockWrite();
         JSONObject response = new JSONObject();
 
-        if (seqnum < this.getHighestSeqnumInLog() || seqnum < this.promisedSeqnum) {
+        if (seqnum <= this.getHighestSeqnumInLog() || seqnum < this.promisedSeqnum) {
             // Ignore request
             response.put("success", "true");
             response.put("reply", "rejected");

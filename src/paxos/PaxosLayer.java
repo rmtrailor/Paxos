@@ -5,6 +5,7 @@ import org.json.simple.JSONObject;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.Random;
 import java.util.logging.*;
 
 /**
@@ -16,6 +17,7 @@ public class PaxosLayer {
 
     private final int numNodes;
     private Membership membership;
+    private Random rand;
 
     /**
      * Initializes the layer by setting up N nodes where N = numNodes
@@ -37,37 +39,25 @@ public class PaxosLayer {
             this.membership.createNode(i, 8000 + i, "UP");
 
         this.membership.setInitialized();
+        this.rand = new Random();
     }
 
 
     /**
      * API for sending a request to the Paxos nodes.
-     * @param id The id of the Paxos node the client wishes to send a request to.
+     * @param value The value the client application is requesting consensus on
      */
-    public JSONObject sendRequest(int id, int seqnum, int value) throws MalformedURLException {
-        JSONObject results = new JSONObject();
-
-        if (id < 0 || id > numNodes) {
-            // invalid id
-            results.put("success", "false");
-            results.put("err", "Invalid id");
-            return results;
-        }
-
-        NodeInfo nodeCopy = this.membership.getNode(id);
-
-        if (nodeCopy == null) {
-            results.put("success", "false");
-            results.put("err", "Node not found");
-            return results;
-        }
+    public JSONObject sendRequest(int value) throws MalformedURLException {
+        // For our use, we'll just select a paxos node at random to save us from any
+        // complicated overhead.
+        int nodeId = rand.nextInt(3);
+        NodeInfo nodeCopy = this.membership.getNode(nodeId);
 
         JSONObject info = new JSONObject();
-        info.put("seqnum", seqnum);
         info.put("value", value);
 
         // Make the request and save the response
-        Request request = Communication.sendMessage(id, nodeCopy.getPort(), Communication.GET_VALUE, info);
+        Request request = Communication.sendMessage(nodeId, nodeCopy.getPort(), Communication.GET_VALUE, info);
 
         return request.getContent();
     }

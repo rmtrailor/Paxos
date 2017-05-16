@@ -44,7 +44,7 @@ public class Communication {
             switch (type) {
                 // Used by the client to send a message for paxos to start consensus on a proposed value with sequence num
                 case GET_VALUE:
-                    params = "?seqnum=" + info.get("seqnum") + "&value=" + info.get("value");
+                    params = "?value=" + info.get("value");
                     url = new URL(DOMAIN + port + API + SEND_VALUE + params);
                     request = new Request(url);
                     break;
