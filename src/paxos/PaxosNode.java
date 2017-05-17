@@ -193,11 +193,12 @@ public class PaxosNode {
                 int seqnum = this.log.generateNextSeqnum();
                 int numAttempts = 0;
                 int MAX_ATTEMPTS = 5;
+
                 // * TEST *
                 // If value = 1111, then we'll test a rejected sequence number. We'll just use -1 for an example.
                 if (value == 1111) {
                     System.out.println("Testing rejected sequence number. Using seqnum = -1");
-                    seqnum = -1;
+                    seqnum = -99999;
                 }
 
                 LOGGER.log(Level.FINE, "Got request from client for consensus on value: {0}, attempting with seq num: {1}",

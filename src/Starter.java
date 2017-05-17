@@ -5,13 +5,13 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 
 /**
- * Start is a class that starts either a Client node or a Paxos Node.
+ * Starter is a class that starts either a Client node or a Paxos Node.
  */
 public class Starter {
     public static void main(String[] args) {
 
         /*
-         * Usage (Client): Starter client
+         * Usage (Client): Starter client <number of paxos nodes>
          * Usage (Paxos Node): Starter paxos <id>
          */
         if (args[1].equals("client")) {
